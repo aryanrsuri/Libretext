@@ -47,7 +47,7 @@ async function handler(request, response) {
 				
 				let input = JSON.parse(body);
 				//Only get requests are acceptable
-				let requests = await LibreTexts.authenticatedFetch(input.path, 'contents?mode=raw', input.subdomain, 'Cross-Library');
+				let requests = await LibreTexts.authenticatedFetch(input.path, 'contents?mode=raw', input.subdomain, 'LibreBot');
 				if (requests.ok)
 					response.write(await requests.text());
 				else
@@ -190,12 +190,13 @@ async function handler(request, response) {
 					if (await fs.exists(`./public/DownloadsCenter/${input.subdomain}/${filenamify(input.path)}.json`)) {
 						let content = await fs.readJSON(`./public/DownloadsCenter/${input.subdomain}/${filenamify(input.path)}.json`);
 						if (content) {
-							let index = content.findIndex(elem => elem.id === input.content.id);
+							let array = content.items || content;
+							let index = array.findIndex(elem => elem.id === input.content.id);
 							if (index && index !== -1) {
-								content[index] = input.content;
+								array[index] = input.content;
 							}
 							else {
-								content.push(input.content);
+								array.push(input.content);
 							}
 							await fs.writeJSON(`./public/DownloadsCenter/${input.subdomain}/${filenamify(input.path)}.json`, content);
 						}
@@ -248,6 +249,22 @@ async function handler(request, response) {
 			else {
 				console.error(await contents.text());
 			}
+			response.end();
+		}
+	}
+	else if (url.startsWith('/queryEvents')) {
+		if (!request.headers.origin || !request.headers.origin.endsWith('adapt.libretexts.org')) {
+			responseError('Forbidden', 403);
+		}
+		else if (request.method === 'GET') {
+			let [, queryParams] = url.split('/queryEvents');
+			let requests;
+			requests = await LibreTexts.authenticatedFetch(`https://query.libretexts.org/@api/deki/events/page-hierarchy/home${queryParams || ''}`, null, null, authen['getAuthors'])
+			if (requests.ok)
+				response.write(await requests.text());
+			else
+				responseError(`${requests.statusText}\n${await requests.text()}`, 400);
+			
 			response.end();
 		}
 	}
